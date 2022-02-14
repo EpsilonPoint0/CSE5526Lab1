@@ -1,102 +1,60 @@
 import numpy as np
 import matplotlib as plt
 import matplotlib.pyplot as mp
-
-
-
 class MLP:
-    test1 = None
-    test2 = None
-    target1 = None
-    target2 = None
-    num_inputs = 2
-    num_neurons = 6
-    num_outputs = 1
-    W1 = np.random.uniform(size=(num_inputs,num_neurons))
-    W2 = np.random.uniform(size=(num_neurons,num_outputs))
-    b1 = np.random.uniform(low=-0.1, high=0.1, size=(1,num_neurons))
-    b2 = np.random.uniform(low=-0.1, high=0.1, size=(1,num_neurons))
-    parameters = {"W1": W1, "W2": W2, "b1":b1, "b2": b2}
-
-    mlp_types= [
-    {"input_dim": 2, "output_dim": 1, "activation": "sigmoid"},
-    {"input_dim": 2, "output_dim": 1, "activation": "sigmoid"},
-    ]
 
     # Initialize data
-    def __init__(self):
+    def __init__(self, layers, alpha=0, nu=0.0002):
+        self.W1 = []
+        self.W2 = []
+        self.layers = layers
+        self.nu = nu
+        self.alpha = alpha
+
+        # Uniformly generate two sets of data and targets
         self.test1 = np.random.uniform(low=-1, high=1, size=(200, 2))
-        self.target1 = []
+        self.target1colors = []
+        self.target1nums = []
         for pt in self.test1:
             if np.abs(np.sin(np.pi*pt[0])) > np.abs(pt[1]):
-                self.target1.append('blue')
+                self.target1colors.append('blue')
+                self.target1nums.append(1)
             else:
-                self.target1.append('red')
-        test1 = self.test1
-        target1 = self.target1
+                self.target1colors.append('red')
+                self.target1nums.append(0)
+        
 
         self.test2 = np.random.uniform(low=-1, high=1, size=(200, 2))
-        self.target2 = []
+        self.target2colors = []
+        self.target2nums = []
         for pt in self.test2:
             if np.abs(np.sin(np.pi*pt[0])) > np.abs(pt[1]):
-                self.target2.append('blue')
+                self.target2colors.append('blue')
+                self.target2nums.append(1)
             else:
-                self.target2.append('red')
-        test2 = self.test2
-        target2 = self.target2
+                self.target2colors.append('red')
+                self.target2nums.append(0)
 
-    def linear_dot_product(W, X, b):
-        return (X@W) + b
+        # Initialize weight vectors
+        for i in np.arange(0, len(layers) -2):
+            #W1 = np.random.uniform(layers[i] +1, layers[i + 1] + 1)
+            W1 = np.random.uniform(low=-0.1, high = 0.1, size=(layers[i] +1, layers[i + 1] + 1))
+            self.W1.append(W1 / np.sqrt(layers[i]))
+            W2 = np.random.uniform(layers[i] +1, layers[i + 1] + 1)
+            self.W2.append(W2 / np.sqrt(layers[i]))
 
-    def sigmoid(Z):
-        return 1/(1+np.exp(-Z))
-
-    def sigmoid_derivative(dA, Z):
-        sig_result = MLP.sigmoid(Z)
-        return dA * sig_result * (1 - sig_result)
-
-    def relu(Z):
-        return np.maximum(0,Z)
-
-    def relu_derivative(dA, Z):
-        dZ = np.array(dA, copy = True)
-        dZ[Z <= 0] = 0
-        return dZ
+        w = np.random.uniform(low=-0.1, high = 0.1, size=(layers[-2] +1, layers[-1]))
+        self.W1.append(w / np.sqrt(layers[-2]))
 
 
-    def cost_function(neurons_activated, expected_values):
-        return (np.mean(np.power(neurons_activated - expected_values, 2)))/2
+    def sigmoid(self, Z):
+        return 1.0/(1+np.exp(-Z))
 
-    def single_layer_fp(A_prev, W_curr, b_curr, activation="relu"):
-        Z_curr = np.dot(W_curr, A_prev) + b_curr
+    def sigmoid_derivative(self, Z):
         
-        if activation == "relu":
-            activation_func = MLP.relu
-        elif activation == "sigmoid":
-            activation_func = MLP.sigmoid
-        
-        
-        return activation_func(Z_curr), Z_curr
+        return Z * (1 - Z)
 
-    def full_fp(X, params_values, mlp_types):
-        memory = {}
-        A_curr = X
-        
-        for idx, layer in enumerate(mlp_types):
-            layer_idx = idx + 1
-            A_prev = A_curr
-            
-            activ_function_curr = layer["activation"]
-            W_curr = params_values["W" + str(layer_idx)]
-            b_curr = params_values["b" + str(layer_idx)]
-            A_curr, Z_curr = MLP.single_layer_forward_propagation(A_prev, W_curr, b_curr, activ_function_curr)
-            
-            memory["A" + str(idx)] = A_prev
-            memory["Z" + str(layer_idx)] = Z_curr
-        
-        return A_curr, memory
-
-
+    # Split data into x and y coordinates to plot
     def plot_data(self):
         x_vals = []
         y_vals = []
@@ -108,93 +66,168 @@ class MLP:
         self.y_vals = y_vals
 
         for i in range(len(x_vals)):
-
-            mp.scatter(x_vals[i], y_vals[i], c = self.target1[i])
-        mp.show()
+            mp.scatter(x_vals[i], y_vals[i], c = self.target1colors[i])
         #print(xvals)
         #print(yvals)
 
-    def get_cost_value(Y_hat, Y):
-        m = Y_hat.shape[1]
-        cost = -1 / m * (np.dot(Y, np.log(Y_hat).T) + np.dot(1 - Y, np.log(1 - Y_hat).T))
-        return np.squeeze(cost)
 
-    def get_accuracy_value(Y_hat, Y):
-        Y_hat_ = MLP.convert_prob_into_class(Y_hat)
-        return (Y_hat_ == Y).all(axis=0).mean()
+    def train(self, X, Y, epochs=1000):
+        update=100
+        # Create biases and combine with data
+        b1 = np.random.uniform(low=-0.1, high=0.1, size=200)
+        #b2 = np.random.uniform(low=-0.1, high=0.1, size=200)
+        #print(X)
+        #print(b1)
+        X = np.c_[X, b1]
 
-    def convert_prob_into_class(Y_hat):
-        #TODO
-        x =0
+        loss_per_epoch = {}
 
-    def single_layer_bp(dA_curr, W_curr, b_curr, Z_curr, A_prev, activation="relu"):
-        m = A_prev.shape[1]
+        # Train the network
+        for epoch in np.arange(0, epochs):
+            for (x, target) in zip(X, Y):
+                self.weight_update(x, target)
+            
+            if epoch == 0 or (epoch + 1) % update == 0:
+                loss = self.loss_function(X, Y)
+                loss_per_epoch[epoch + 1] = loss
+                print("Current Epoch={}, loss={:.7f}".format(
+                    epoch + 1, loss))
+                if epoch > 1000 and (loss_per_epoch[epoch + 1] - loss_per_epoch[epoch -99]) < 0.01:
+                    print("Stopping...")
+                    return 
+                
+                
     
-        if activation == "relu":
-            ba_function = MLP.relu_derivative
-        elif activation == "sigmoid":
-            ba_function = MLP.sigmoid_derivative
+    def weight_update(self, x, y):
 
-    
-        dZ_curr = ba_function(dA_curr, Z_curr)
-        dW_curr = np.dot(dZ_curr, A_prev.T) / m
-        db_curr = np.sum(dZ_curr, axis=1, keepdims=True) / m
-        dA_prev = np.dot(W_curr.T, dZ_curr)
+        output_activations = [np.atleast_2d(x)]
+        #print(self.W1)
 
-        return dA_prev, dW_curr, db_curr
+        # Forward propagation phase
+        for layer in np.arange(0, len(self.W1)):
 
-    def full_bp(Y_hat, Y, memory, params_values, mlp_types):
-        grads_values = {}
-        m = Y.shape[1]
-        Y = Y.reshape(Y_hat.shape)
-    
-        dA_prev = - (np.divide(Y, Y_hat) - np.divide(1 - Y, 1 - Y_hat));
-        
-        for layer_idx_prev, layer in reversed(list(enumerate(mlp_types))):
-            layer_idx_curr = layer_idx_prev + 1
-            activ_function_curr = layer["activation"]
-            
-            dA_curr = dA_prev
-            
-            A_prev = memory["A" + str(layer_idx_prev)]
-            Z_curr = memory["Z" + str(layer_idx_curr)]
-            W_curr = params_values["W" + str(layer_idx_curr)]
-            b_curr = params_values["b" + str(layer_idx_curr)]
-            
-            dA_prev, dW_curr, db_curr = MLP.single_layer_backward_propagation(
-                dA_curr, W_curr, b_curr, Z_curr, A_prev, activ_function_curr)
-            
-            grads_values["dW" + str(layer_idx_curr)] = dW_curr
-            grads_values["db" + str(layer_idx_curr)] = db_curr
-        
-        return grads_values
+            net_input = output_activations[layer].dot(self.W1[layer])
 
-    def update(params_values, grads_values, mlp_types, learning_rate):
-        for layer_idx, layer in enumerate(mlp_types):
-            params_values["W1" + str(layer_idx)] -= learning_rate * grads_values["dW" + str(layer_idx)]        
-            params_values["b1" + str(layer_idx)] -= learning_rate * grads_values["db" + str(layer_idx)]
+            net_output = self.sigmoid(net_input)
 
-        return params_values
+            output_activations.append(net_output)
 
-    def train_network(X, Y, mlp_types, epochs, learning_rate):
-        
-        cost_history = []
-        accuracy_history = []
-        
-        for i in range(epochs):
-            Y_hat, cashe = MLP.full_fp(X, MLP.parameters, mlp_types)
-            cost = MLP.get_cost_value(Y_hat, Y)
-            cost_history.append(cost)
-            accuracy = MLP.get_accuracy_value(Y_hat, Y)
-            accuracy_history.append(accuracy)
-            
-            grads_values = MLP.full_bp(Y_hat, Y, cashe, params_values, mlp_types)
-            params_values = MLP.update(params_values, grads_values, mlp_types, learning_rate)
-            
-        return params_values, cost_history, accuracy_history
+        # Backpropagate and use chain rule for all layers of network   
+        error = output_activations[-1] - y
 
-    
+        partial_deriv = [error * self.sigmoid_derivative(output_activations[-1])]
 
-MLP1 = MLP()
-MLP1.plot_data()     
-MLP1.train_network(MLP1.x_vals, MLP1.y_vals, MLP1.mlp_types, 100)
+        for layer in np.arange(len(output_activations) - 2, 0, -1):
+
+            delta = partial_deriv[-1].dot(self.W1[layer].T)
+            delta = delta * self.sigmoid_derivative(output_activations[layer])
+            partial_deriv.append(delta)
+
+        partial_deriv = partial_deriv[::-1]
+
+        # Update the weights with an optional momentum term alpha
+        for layer in np.arange(0, len(self.W1)):
+            if self.alpha == 0:
+                self.W1[layer] += -self.nu * output_activations[layer].T.dot(partial_deriv[layer])
+            else:
+                self.W1[layer] += -self.nu * output_activations[layer].T.dot(partial_deriv[layer])*self.alpha
+
+    def predict(self, X, last_layer=True):
+
+        p = np.atleast_2d(X)
+
+        if last_layer:
+
+            p = np.c_[p, np.ones((p.shape[0]))]
+
+        for layer in np.arange(0, len(self.W1)):
+
+            p = self.sigmoid(np.dot(p, self.W1[layer]))
+
+        return p
+
+    def loss_function(self, X, targets):
+        predictions = self.predict(X, last_layer=False)
+        loss = self.nu * np.sum((predictions - targets) ** 2)
+        # return the loss
+        return loss
+
+    def step_function(self, data):
+        predictions = []
+        for x in data:
+            pred = self.predict(x)[0][0]
+            predictions.append(1) if pred > 0.5 else predictions.append(0)
+        return predictions
+
+    def print_data(self):
+        print(self.test2)
+        print(self.target2nums)
+
+
+MLP1 = MLP([2, 6, 1])
+# MLP1.print_data
+#print(MLP1.test1)
+MLP1.plot_data()
+
+min1, max1 = MLP1.test2[:, 0].min()-1, MLP1.test2[:, 0].max()+1
+min2, max2 = MLP1.test2[:, 1].min()-1, MLP1.test2[:, 1].max()+1
+
+x1grid = np.arange(min1, max1, 0.1)
+x2grid = np.arange(min2, max2, 0.1)
+
+xx, yy = np.meshgrid(x1grid, x2grid)
+
+r1, r2 = xx.flatten(), yy.flatten()
+r1, r2 = r1.reshape((len(r1), 1)), r2.reshape((len(r2), 1))
+
+grid = np.hstack((r1,r2))
+MLP1.train(MLP1.test1, MLP1.target1nums, epochs=10000)
+#predictions = MLP1.step_function(MLP1.test2)
+print(grid)
+yhat = MLP1.step_function(MLP1.test2)
+
+#zz = np.reshape(yhat, xx.shape)
+
+#print(xx, yy, zz)
+#mp.contourf(xx, yy, zz, cmap=plt.cm.Paired)
+
+mp.show()
+
+def MLP_4hu():
+    MLP2 = MLP([2, 4, 1])
+    #print(MLP2.test1)
+    #print(MLP2.target1nums)
+    #MLP2.plot_data()
+    #print(MLP2.test1)
+    MLP2.train(MLP2.test1, MLP2.target1nums, epochs=1000)
+    MLP2.step_function(MLP2.test1, MLP2.target1nums)
+
+
+def MLP_8hu():
+    MLP3 = MLP([2, 8, 1])
+    #print(MLP2.test1)
+    #print(MLP2.target1nums)
+    #MLP2.plot_data()
+    #print(MLP2.test1)
+    MLP3.train(MLP3.test1, MLP3.target1nums, epochs=1000)
+    MLP3.step_function(MLP3.test1, MLP3.target1nums)
+
+
+def MLP_12hu():
+    MLP4 = MLP([2, 12, 1])
+    #print(MLP2.test1)
+    #print(MLP2.target1nums)
+    #MLP2.plot_data()
+    #print(MLP2.test1)
+    MLP4.train(MLP4.test1, MLP4.target1nums, epochs=1000)
+    MLP4.step_function(MLP4.test1, MLP4.target1nums)
+
+def MLP_20hu():
+    MLP5 = MLP([2, 20, 1])
+    #print(MLP2.test1)
+    #print(MLP2.target1nums)
+    #MLP2.plot_data()
+    #print(MLP2.test1)
+    MLP5.train(MLP5.test1, MLP5.target1nums, epochs=1000)
+    MLP5.step_function(MLP5.test1, MLP5.target1nums)
+

@@ -1,6 +1,20 @@
 import numpy as np
 import matplotlib as plt
 import matplotlib.pyplot as mp
+
+# The MLP class is the implementation of the multilayer perceptron algorithm with backpropagation
+# To use the class, instansiate an object with an array that has a length of the number of layers in the perceptron and each value corresponds to the number of nodes in that layer
+# Optional parameters are:
+# alpha: The momentum term in the weight update. Default is none
+# nu: The learning rate in the weight update. The default is 0.0002
+# auto_stop: the minimum number of epochs to run before potentially stopping early
+# Then use the train function on the instantiated object to train the network
+# The parameters are:
+# X: the data
+# y: the true classifications
+# epochs: The number of times to run the algorithm. Default is 10000
+# Finally, use the step_function function to return the predictions and the classification_error function to return the classification error
+# Use plot_data to plot the data
 class MLP:
 
     # Initialize data
@@ -38,7 +52,6 @@ class MLP:
 
         # Initialize weight vectors
         for i in np.arange(0, len(layers) -2):
-            #W1 = np.random.uniform(layers[i] +1, layers[i + 1] + 1)
             W1 = np.random.uniform(low=-0.1, high = 0.1, size=(layers[i] +1, layers[i + 1] + 1))
             self.W1.append(W1 / np.sqrt(layers[i]))
             W2 = np.random.uniform(layers[i] +1, layers[i + 1] + 1)
@@ -67,17 +80,15 @@ class MLP:
 
         for i in range(len(x_vals)):
             mp.scatter(x_vals[i], y_vals[i], c = self.target1colors[i])
-        #print(xvals)
-        #print(yvals)
+
 
 
     def train(self, X, Y, epochs=10000):
         update=100
-        # Create biases and combine with data
+
+        # Create biases with unifrom distrobution and add to data
         b1 = np.random.uniform(low=-0.1, high=0.1, size=200)
-        #b2 = np.random.uniform(low=-0.1, high=0.1, size=200)
-        #print(X)
-        #print(b1)
+        self.b1 = b1
         X = np.c_[X, b1]
 
         loss_per_epoch = {}
@@ -92,6 +103,7 @@ class MLP:
                 loss_per_epoch[epoch + 1] = loss
                 print("Current Epoch={}, loss={:.7f}".format(
                     epoch + 1, loss))
+                # Stop early based on difference of loss per 100 epochs
                 if epoch > self.auto_stop and (loss_per_epoch[epoch + 1] - loss_per_epoch[epoch -99]) < 0.00001:
                     print("Stopping...")
                     return 
@@ -132,30 +144,39 @@ class MLP:
             else:
                 self.W1[layer] += -self.nu * output_activations[layer].T.dot(partial_deriv[layer]*self.alpha)
 
-    def predict(self, X, last_layer=True):
+    def output(self, X, last_layer=True):
 
-        p = np.atleast_2d(X)
+        prediction = np.atleast_2d(X)
 
         if last_layer:
+            prediction = np.c_[prediction, self.b1[0]]
+            #print (prediction)
 
-            p = np.c_[p, np.ones((p.shape[0]))]
-
+        # Pass through activation function
         for layer in np.arange(0, len(self.W1)):
 
-            p = self.sigmoid(np.dot(p, self.W1[layer]))
+            prediction = self.sigmoid(np.dot(prediction, self.W1[layer]))
 
-        return p
+        return prediction
 
     def loss_function(self, X, targets):
-        predictions = self.predict(X, last_layer=False)
+        predictions = self.output(X, last_layer=False)
         loss = self.nu * np.sum((predictions - targets) ** 2)
         return loss
 
     def step_function(self, data):
         predictions = []
+        sum = 0
+        length = []
         for x in data:
-            pred = self.predict(x)[0][0]
-            predictions.append(1) if pred > 0.5 else predictions.append(0)
+            pred = self.output(x)[0][0]
+            length.append(pred)
+            sum += pred
+        
+        avg = sum / len(length)
+        for i in length:
+            predictions.append(1) if i > avg else predictions.append(0)
+
         return predictions
 
     def print_data(self):
@@ -163,7 +184,6 @@ class MLP:
         print(self.target2nums)
 
     def classification_error(self, results):
-        classification_error = 0
         correct = 0
         incorrect = 0
         for i in range(len(results)):
@@ -172,42 +192,25 @@ class MLP:
             else:
                 incorrect = incorrect + 1
 
-        return incorrect / correct
+        return incorrect / len(results)
 
 
 MLP1 = MLP([2, 20, 1], alpha=0.8,auto_stop=1000)
-# MLP1.print_data
-#print(MLP1.test1)
+
 MLP1.plot_data()
 
-min1, max1 = MLP1.test2[:, 0].min()-1, MLP1.test2[:, 0].max()+1
-min2, max2 = MLP1.test2[:, 1].min()-1, MLP1.test2[:, 1].max()+1
+MLP1.train(MLP1.test1, MLP1.target1nums, epochs=10000)
 
-x1grid = np.arange(min1, max1, 1)
-x2grid = np.arange(min2, max2, 1)
+results = MLP1.step_function(MLP1.test2)
 
-xx, yy = np.meshgrid(x1grid, x2grid)
-
-r1, r2 = xx.flatten(), yy.flatten()
-r1, r2 = r1.reshape((len(r1), 1)), r2.reshape((len(r2), 1))
-
-grid = np.hstack((r1,r2))
-#print(grid)
-MLP1.train(MLP1.test2, MLP1.target2nums, epochs=10000)
-#predictions = MLP1.step_function(MLP1.test2)
-
-results = MLP1.step_function(MLP1.test1)
-for i in range(0, len(results)):
-    if i % 3 == 0:
-        results[i] = 0
 
 classification_error = MLP1.classification_error(results)
 print(classification_error)
 
-#zz = np.reshape(yhat, xx.shape)
-#np.reshape(results, (20,10))
-#print(xx, yy, zz)
-#mp.contourf(MLP1.x_vals, MLP1.y_vals, np.reshape(MLP1.target1nums, (2, 100)), cmap=plt.cm.Paired)
+x = np.linspace(-1, 1, 100)
+y = np.sin(4.7*x)
+mp.plot(x, y)
+
 
 #mp.show()
 

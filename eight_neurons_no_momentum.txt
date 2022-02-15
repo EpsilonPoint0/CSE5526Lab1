@@ -1,14 +1,14 @@
-Current Epoch=1, loss=2.0046363
-Current Epoch=100, loss=1.8385018
-Current Epoch=200, loss=1.7844537
-Current Epoch=300, loss=1.7660259
-Current Epoch=400, loss=1.7593028
-Current Epoch=500, loss=1.7567260
-Current Epoch=600, loss=1.7557053
-Current Epoch=700, loss=1.7552920
-Current Epoch=800, loss=1.7551223
-Current Epoch=900, loss=1.7550519
-Current Epoch=1000, loss=1.7550226
-Current Epoch=1100, loss=1.7550103
+Current Epoch=1, loss=1.9778707
+Current Epoch=100, loss=1.9279957
+Current Epoch=200, loss=1.9115639
+Current Epoch=300, loss=1.9060831
+Current Epoch=400, loss=1.9042062
+Current Epoch=500, loss=1.9035524
+Current Epoch=600, loss=1.9033226
+Current Epoch=700, loss=1.9032419
+Current Epoch=800, loss=1.9032138
+Current Epoch=900, loss=1.9032044
+Current Epoch=1000, loss=1.9032014
+Current Epoch=1100, loss=1.9032008
 Stopping...
-0.9348623853211009
+0.565

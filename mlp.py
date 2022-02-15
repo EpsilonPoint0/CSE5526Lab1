@@ -4,12 +4,13 @@ import matplotlib.pyplot as mp
 class MLP:
 
     # Initialize data
-    def __init__(self, layers, alpha=0, nu=0.0002):
+    def __init__(self, layers, alpha=0, nu=0.0002, auto_stop=10000):
         self.W1 = []
         self.W2 = []
         self.layers = layers
         self.nu = nu
         self.alpha = alpha
+        self.auto_stop = auto_stop
 
         # Uniformly generate two sets of data and targets
         self.test1 = np.random.uniform(low=-1, high=1, size=(200, 2))
@@ -51,7 +52,6 @@ class MLP:
         return 1.0/(1+np.exp(-Z))
 
     def sigmoid_derivative(self, Z):
-        
         return Z * (1 - Z)
 
     # Split data into x and y coordinates to plot
@@ -71,7 +71,7 @@ class MLP:
         #print(yvals)
 
 
-    def train(self, X, Y, epochs=1000):
+    def train(self, X, Y, epochs=10000):
         update=100
         # Create biases and combine with data
         b1 = np.random.uniform(low=-0.1, high=0.1, size=200)
@@ -92,7 +92,7 @@ class MLP:
                 loss_per_epoch[epoch + 1] = loss
                 print("Current Epoch={}, loss={:.7f}".format(
                     epoch + 1, loss))
-                if epoch > 1000 and (loss_per_epoch[epoch + 1] - loss_per_epoch[epoch -99]) < 0.01:
+                if epoch > self.auto_stop and (loss_per_epoch[epoch + 1] - loss_per_epoch[epoch -99]) < 0.00001:
                     print("Stopping...")
                     return 
                 
@@ -130,7 +130,7 @@ class MLP:
             if self.alpha == 0:
                 self.W1[layer] += -self.nu * output_activations[layer].T.dot(partial_deriv[layer])
             else:
-                self.W1[layer] += -self.nu * output_activations[layer].T.dot(partial_deriv[layer])*self.alpha
+                self.W1[layer] += -self.nu * output_activations[layer].T.dot(partial_deriv[layer]*self.alpha)
 
     def predict(self, X, last_layer=True):
 
@@ -149,7 +149,6 @@ class MLP:
     def loss_function(self, X, targets):
         predictions = self.predict(X, last_layer=False)
         loss = self.nu * np.sum((predictions - targets) ** 2)
-        # return the loss
         return loss
 
     def step_function(self, data):
@@ -163,8 +162,20 @@ class MLP:
         print(self.test2)
         print(self.target2nums)
 
+    def classification_error(self, results):
+        classification_error = 0
+        correct = 0
+        incorrect = 0
+        for i in range(len(results)):
+            if(MLP1.target1nums[i] == results[i]):
+                correct = correct + 1
+            else:
+                incorrect = incorrect + 1
 
-MLP1 = MLP([2, 6, 1])
+        return incorrect / correct
+
+
+MLP1 = MLP([2, 20, 1], alpha=0.8,auto_stop=1000)
 # MLP1.print_data
 #print(MLP1.test1)
 MLP1.plot_data()
@@ -172,8 +183,8 @@ MLP1.plot_data()
 min1, max1 = MLP1.test2[:, 0].min()-1, MLP1.test2[:, 0].max()+1
 min2, max2 = MLP1.test2[:, 1].min()-1, MLP1.test2[:, 1].max()+1
 
-x1grid = np.arange(min1, max1, 0.1)
-x2grid = np.arange(min2, max2, 0.1)
+x1grid = np.arange(min1, max1, 1)
+x2grid = np.arange(min2, max2, 1)
 
 xx, yy = np.meshgrid(x1grid, x2grid)
 
@@ -181,53 +192,24 @@ r1, r2 = xx.flatten(), yy.flatten()
 r1, r2 = r1.reshape((len(r1), 1)), r2.reshape((len(r2), 1))
 
 grid = np.hstack((r1,r2))
-MLP1.train(MLP1.test1, MLP1.target1nums, epochs=10000)
+#print(grid)
+MLP1.train(MLP1.test2, MLP1.target2nums, epochs=10000)
 #predictions = MLP1.step_function(MLP1.test2)
-print(grid)
-yhat = MLP1.step_function(MLP1.test2)
+
+results = MLP1.step_function(MLP1.test1)
+for i in range(0, len(results)):
+    if i % 3 == 0:
+        results[i] = 0
+
+classification_error = MLP1.classification_error(results)
+print(classification_error)
 
 #zz = np.reshape(yhat, xx.shape)
-
+#np.reshape(results, (20,10))
 #print(xx, yy, zz)
-#mp.contourf(xx, yy, zz, cmap=plt.cm.Paired)
+#mp.contourf(MLP1.x_vals, MLP1.y_vals, np.reshape(MLP1.target1nums, (2, 100)), cmap=plt.cm.Paired)
 
-mp.show()
-
-def MLP_4hu():
-    MLP2 = MLP([2, 4, 1])
-    #print(MLP2.test1)
-    #print(MLP2.target1nums)
-    #MLP2.plot_data()
-    #print(MLP2.test1)
-    MLP2.train(MLP2.test1, MLP2.target1nums, epochs=1000)
-    MLP2.step_function(MLP2.test1, MLP2.target1nums)
+#mp.show()
 
 
-def MLP_8hu():
-    MLP3 = MLP([2, 8, 1])
-    #print(MLP2.test1)
-    #print(MLP2.target1nums)
-    #MLP2.plot_data()
-    #print(MLP2.test1)
-    MLP3.train(MLP3.test1, MLP3.target1nums, epochs=1000)
-    MLP3.step_function(MLP3.test1, MLP3.target1nums)
-
-
-def MLP_12hu():
-    MLP4 = MLP([2, 12, 1])
-    #print(MLP2.test1)
-    #print(MLP2.target1nums)
-    #MLP2.plot_data()
-    #print(MLP2.test1)
-    MLP4.train(MLP4.test1, MLP4.target1nums, epochs=1000)
-    MLP4.step_function(MLP4.test1, MLP4.target1nums)
-
-def MLP_20hu():
-    MLP5 = MLP([2, 20, 1])
-    #print(MLP2.test1)
-    #print(MLP2.target1nums)
-    #MLP2.plot_data()
-    #print(MLP2.test1)
-    MLP5.train(MLP5.test1, MLP5.target1nums, epochs=1000)
-    MLP5.step_function(MLP5.test1, MLP5.target1nums)
 

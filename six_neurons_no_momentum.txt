@@ -1,0 +1,14 @@
+Current Epoch=1, loss=1.9919783
+Current Epoch=100, loss=1.8711837
+Current Epoch=200, loss=1.8209164
+Current Epoch=300, loss=1.7996620
+Current Epoch=400, loss=1.7903053
+Current Epoch=500, loss=1.7860436
+Current Epoch=600, loss=1.7840521
+Current Epoch=700, loss=1.7831040
+Current Epoch=800, loss=1.7826466
+Current Epoch=900, loss=1.7824241
+Current Epoch=1000, loss=1.7823151
+Current Epoch=1100, loss=1.7822617
+Stopping...
+0.9218518518518519

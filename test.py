@@ -26,7 +26,7 @@ model = LogisticRegression()
 model.fit(X, y)
 # make predictions for the grid
 yhat = model.predict(grid)
-print(yhat)
+print(len(yhat))
 # reshape the predictions back into a grid
 zz = yhat.reshape(xx.shape)
 print(zz)

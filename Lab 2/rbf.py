@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib as plt
+import matplotlib.pyplot as mp
 
 # 1) Generate a set of 100 data points by sampling the function LaTeX: h\left(x\right)=0.5+0.4\cos\left(2.5\pi x\right) with added uniform noise in the interval [-0.1, 0.1] and with x values taken randomly
 #  from a uniform distribution in the interval [0.0, 1.0].
@@ -23,28 +25,31 @@ import numpy as np
 
 class RBF:
 
-    def __init__(self, bases, nu, epochs=100):
+    def __init__(self, bases, nu, epochs=100, kmeans=1):
         self.bases = bases
         self.nu = nu
         self.epochs = epochs
+        self.kmeans =kmeans
+        self.variance = []
+        self.inputs = np.random.uniform(low=-1, high=1, size=(100, 1))
         noise = np.random.uniform(low=-0.1, high=0.1, size=(100, 1))
-        initial_x_vals = np.random.uniform(low=0, high=1.0, size=(100, 1))
-        inputs = []
+        initial_targets = np.random.uniform(low=0, high=1.0, size=(100, 1))
+        targets = []
         for i in range(0, 100):
-            x_val = 0.5 + 0.4 * np.cos(2.5 * np.pi * initial_x_vals[i]) + noise[i]
-            inputs.append(x_val[0])
-        self.inputs = inputs
+            x_val = 0.5 + 0.4 * np.cos(2.5 * np.pi * initial_targets[i]) + noise[i]
+            targets.append(x_val[0])
+        self.targets = targets
         
 
-        self.weights = np.random.uniform(low=0, high=1.0, size=(100, 1))
-        self.biases = np.random.uniform(low=0, high=1.0, size=(100, 1))
+        self.weights = np.random.uniform(low=0, high=1.0, size=2)
+        self.biases = np.random.uniform(low=0, high=1.0, size=1)
 
-        def gaussian_rbf(self, x, mean, standard_deviation):
-            return np.exp((-(x-mean)**2) / (2 * standard_deviation**2))
+    def gaussian_rbf(self, x, mean, standard_deviation):
+        return np.exp((-(x-mean)**2) / (2 * standard_deviation**2))
 
-        def k_means(self):
+    def k_means(self, num_clusters):
             # Generate random clusters from points
-            current_clusters = np.random.choice(np.squeeze(self.inputs, size=self.bases))
+            current_clusters = np.random.choice(np.squeeze(self.inputs), size=num_clusters)
             updated_clusters = current_clusters.copy()
             # Initialize standard deviations to 0
             variance = np.zeros(self.bases)
@@ -57,7 +62,7 @@ class RBF:
 
                 closest_cluster_to_points = np.argmin(distance_to_clusters, axis=1)
 
-                current_clusters, points_in_cluster = update_clusters(closest_cluster_to_points, current_clusters, self.bases)
+                current_clusters, points_in_cluster = self.update_clusters(closest_cluster_to_points, current_clusters)
                 converged = np.linalg.norm(current_clusters - current_clusters) < 0.000001
 
                 updated_clusters = current_clusters.copy()
@@ -83,46 +88,60 @@ class RBF:
             return current_clusters, variance
                 
 
-        def update_clusters(closest_cluster_to_points, initial_clusters):
-            for i in range(0, self.bases):
-                points_in_cluster = self.inputs[closest_cluster_to_points == i]
-                if len(points_in_cluster) > 0:
-                    initial_clusters[i] = np.mean(points_in_cluster, axis=0)
-            return initial_clusters, points_in_cluster
+    def update_clusters(self, closest_cluster_to_points, initial_clusters):
+        for i in range(0, self.bases):
+            points_in_cluster = self.inputs[closest_cluster_to_points == i]
+            if len(points_in_cluster) > 0:
+                initial_clusters[i] = np.mean(points_in_cluster, axis=0)
+        return initial_clusters, points_in_cluster
 
-        def train(self, targets):
-            self.gaussian_centers, self.variance = self.kmeans()
-            
-            for epoch in range(self.epochs):
-                for i in range(inputs.shape[0]):
-                    for center, std in zip(self.gaussian_centers, self.variance):
-                        gaussian = np.array([self.gaussian_rbf(self.inputs[i], center, std)])
-                        forward_pass = gaussian.T.dot(self.weights) +self.biases
+    def train(self, num_clusters):
+        if(self.kmeans):
+            self.gaussian_centers, self.variance = self.k_means(num_clusters)
+        else:
+            for i in range(self.bases):
+                self.variance[i] = 2
 
-                        loss = self.loss_function(targets[i], forward_pass)
-
-                        backward_prop = -(targets[i] - forward_pass).flatten()
-
-                        self.updates(forward_pass, backward_prop)
-
-
-        def loss_function(self, y, f):
-            return (y - f).flatten() ** 2
-
-        def updates(self, f, bp):
-            self.weights = self.weights - self.nu * f * bp
-            self.biases = self.biases - self.nu * bp
-
-        def step_function(self):
-            predictions = []
+        
+        for epoch in range(self.epochs):
             for i in range(self.inputs.shape[0]):
-                    for center, std in zip(self.gaussian_centers, self.variance):
-                        gaussian = np.array([self.gaussian_rbf(self.inputs[i], center, std)])
-                        forward_pass = gaussian.T.dot(self.weights) +self.biases
-                        predictions.append(forward_pass)
-            return predictions
+                for center, std in zip(self.gaussian_centers, self.variance):
+                    gaussian = np.array([self.gaussian_rbf(self.inputs[i], c, s) for c, s, in zip(self.gaussian_centers, self.variance)])
+                    # print(gaussian)
+
+                forward_pass = gaussian.T.dot(self.weights) +self.biases
+
+                loss = self.loss_function(self.targets[i], forward_pass)
+                print("Current Epoch={}".format(
+                    epoch))
+
+                backward_prop = -(self.targets[i] - forward_pass).flatten()
+
+                self.updates(forward_pass, backward_prop)
+
+
+    def loss_function(self, y, f):
+        return (y - f).flatten() ** 2
+
+    def updates(self, f, bp):
+        self.weights = self.weights - self.nu * f * bp
+        self.biases = self.biases - self.nu * bp
+
+    def step_function(self):
+        predictions = []
+        for i in range(self.inputs.shape[0]):
+                gaussian = np.array([self.gaussian_rbf(self.inputs[i], c, s) for c, s, in zip(self.gaussian_centers, self.variance)])
+                forward_pass = gaussian.T.dot(self.weights) +self.biases
+                predictions.append(forward_pass)
+        return predictions
 
 
 
 
-rbf = RBF(3)
+rbf = RBF(nu=0.01, bases=2)
+rbf.train(5)
+predictions = rbf.step_function()
+mp.plot(rbf.inputs, rbf.targets, '-o', label='true')
+mp.plot(rbf.inputs, predictions, 'o', label='RBF')
+mp.legend()
+mp.show()

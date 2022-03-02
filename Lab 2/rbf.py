@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib as plt
 import matplotlib.pyplot as mp
+from sklearn.cluster import k_means
+from sklearn.linear_model import LinearRegression
 
 # 1) Generate a set of 100 data points by sampling the function LaTeX: h\left(x\right)=0.5+0.4\cos\left(2.5\pi x\right) with added uniform noise in the interval [-0.1, 0.1] and with x values taken randomly
 #  from a uniform distribution in the interval [0.0, 1.0].
@@ -25,27 +27,29 @@ import matplotlib.pyplot as mp
 
 class RBF:
 
-    def __init__(self, bases, nu, epochs=100, kmeans=1):
+    def __init__(self, bases, nu, epochs=100, kmeans=True):
         self.bases = bases
         self.nu = nu
         self.epochs = epochs
         self.kmeans =kmeans
         self.variance = []
-        self.inputs = np.random.uniform(low=-1, high=1, size=(100, 1))
+        self.inputs = np.random.uniform(low=0.0, high=1, size=(100, 1))
         noise = np.random.uniform(low=-0.1, high=0.1, size=(100, 1))
         initial_targets = np.random.uniform(low=0, high=1.0, size=(100, 1))
         targets = []
-        for i in range(0, 100):
-            x_val = 0.5 + 0.4 * np.cos(2.5 * np.pi * initial_targets[i]) + noise[i]
+        #generate data from function
+        for i in range(len(self.inputs)):
+            
+            x_val = 0.5 + 0.4 * np.cos(2.5 * np.pi * self.inputs[i][0]) + noise[i]
             targets.append(x_val[0])
         self.targets = targets
         
 
-        self.weights = np.random.uniform(low=0, high=1.0, size=2)
+        self.weights = np.random.uniform(low=0, high=1.0, size=bases)
         self.biases = np.random.uniform(low=0, high=1.0, size=1)
 
     def gaussian_rbf(self, x, mean, standard_deviation):
-        return np.exp((-(x-mean)**2) / (2 * standard_deviation**2))
+        return np.exp(-1 / (2 * standard_deviation** 2) * (x - mean) ** 2)
 
     def k_means(self, num_clusters):
             # Generate random clusters from points
@@ -57,91 +61,124 @@ class RBF:
             converged = False
 
             while not converged:
-                empty_or_single_point_clusters = []
-                distance_to_clusters = np.squeeze(np.abs(self.inputs[:, np.newaxis] - current_clusters[np.newaxis, :]))
+                
+                distance_to_clusters = self.distance(current_clusters)
 
                 closest_cluster_to_points = np.argmin(distance_to_clusters, axis=1)
 
-                current_clusters, points_in_cluster = self.update_clusters(closest_cluster_to_points, current_clusters)
-                converged = np.linalg.norm(current_clusters - current_clusters) < 0.000001
+                for i in range(num_clusters):
+                    points_in_cluster = self.inputs[closest_cluster_to_points == i]
+                    if len(points_in_cluster) > 0:
+                        current_clusters[i] = np.mean(points_in_cluster, axis = 0)
+
+                converged = self.cluster_dif(current_clusters, updated_clusters)
 
                 updated_clusters = current_clusters.copy()
 
-                distances = np.squeeze(np.abs(self.inputs[:, np.newaxis] - current_clusters[np.newaxis, :]))
-                closest_cluster_to_points = np.argmin(distances, axis=1)
+            distance_to_clusters = self.distance(current_clusters)
+            closest_cluster_to_points = np.argmin(distance_to_clusters, axis=1)
 
-                for i in range(self.bases):
-                    points_in_cluster = self.inputs[closest_cluster_to_points == i]
-                    if len(points_in_cluster) < 2:
-                        empty_or_single_point_clusters.append(i)
-                    else:
-                        variance[i] = np.std(self.inputs[closest_cluster_to_points == i]) **2
-
-                if len(empty_or_single_point_clusters) > 1:
-                    mean_variance_pts = []
-                    for i in range(self.bases):
-                        if i not in empty_or_single_point_clusters:
-                            mean_variance_pts.append(self.inputs[closest_cluster_to_points == i])
-                    mean_variance_pts = np.concatenate(mean_variance_pts).ravel()
-                    variance[empty_or_single_point_clusters] = np.mean(np.std(mean_variance_pts)**2)
-
+            empty_or_single_point_clusters = []
+            for i in range(num_clusters):
+                points_in_cluster = self.inputs[closest_cluster_to_points == i]
+                if(len(points_in_cluster) < 2):
+                    empty_or_single_point_clusters.append(i)
+                    continue
+                else:
+                    variance[i] = np.std(self.inputs[closest_cluster_to_points == i])
+              
+            
+            variance = self.empty_clusters(empty_or_single_point_clusters, num_clusters, closest_cluster_to_points, variance)
             return current_clusters, variance
                 
 
-    def update_clusters(self, closest_cluster_to_points, initial_clusters):
-        for i in range(0, self.bases):
-            points_in_cluster = self.inputs[closest_cluster_to_points == i]
-            if len(points_in_cluster) > 0:
-                initial_clusters[i] = np.mean(points_in_cluster, axis=0)
-        return initial_clusters, points_in_cluster
+    def empty_clusters(self, empty_or_single_point_clusters, num_clusters, closest_cluster_to_points, variance):
+        if(len(empty_or_single_point_clusters) > 0):
+                avgs = []
+                for i in range(num_clusters):
+                    if i not in empty_or_single_point_clusters:
+                        avgs.append(self.inputs[closest_cluster_to_points == i])
+                avgs = np.concatenate(avgs).ravel()
+                variance[empty_or_single_point_clusters] = np.mean(np.std(avgs))
+        return variance
+
+    def distance(self, current_clusters):
+        return np.squeeze(np.abs(self.inputs[:, np.newaxis] - current_clusters[np.newaxis, :]))
+
+    def cluster_dif(self, current_clusters, updated_clusters):
+        return np.linalg.norm(current_clusters - updated_clusters) < 1e-6
 
     def train(self, num_clusters):
         if(self.kmeans):
             self.gaussian_centers, self.variance = self.k_means(num_clusters)
         else:
-            for i in range(self.bases):
-                self.variance[i] = 2
+            self.gaussian_centers, _ = self.k_means(num_clusters)
+            self.avg_variance(num_clusters)
+            
 
-        
         for epoch in range(self.epochs):
             for i in range(self.inputs.shape[0]):
-                for center, std in zip(self.gaussian_centers, self.variance):
-                    gaussian = np.array([self.gaussian_rbf(self.inputs[i], c, s) for c, s, in zip(self.gaussian_centers, self.variance)])
+                gaussian = np.array([self.gaussian_rbf(self.inputs[i], c, s) for c, s, in zip(self.gaussian_centers, self.variance)])
                     # print(gaussian)
-
+                
                 forward_pass = gaussian.T.dot(self.weights) +self.biases
 
                 loss = self.loss_function(self.targets[i], forward_pass)
-                print("Current Epoch={}".format(
-                    epoch))
+                #print("Current Epoch={}".format(
+                    #epoch))
 
                 backward_prop = -(self.targets[i] - forward_pass).flatten()
 
                 self.updates(forward_pass, backward_prop)
 
+        #print(self.weights)
+    def avg_variance(self, num_clusters):
+        max_distance = max([np.abs(center1 - center2) for center1 in self.gaussian_centers for center2 in self.gaussian_centers])
+        self.variance = np.repeat(max_distance / np.sqrt(2*num_clusters), num_clusters)
 
     def loss_function(self, y, f):
         return (y - f).flatten() ** 2
 
     def updates(self, f, bp):
         self.weights = self.weights - self.nu * f * bp
-        self.biases = self.biases - self.nu * bp
+        #self.biases = self.biases - self.nu * bp
 
-    def step_function(self):
-        predictions = []
+    def mse(self):
+        self.predictions = []
         for i in range(self.inputs.shape[0]):
                 gaussian = np.array([self.gaussian_rbf(self.inputs[i], c, s) for c, s, in zip(self.gaussian_centers, self.variance)])
+                #print(gaussian)
                 forward_pass = gaussian.T.dot(self.weights) +self.biases
-                predictions.append(forward_pass)
-        return predictions
+                self.predictions.append(forward_pass) 
+        return self.predictions
+
+    def plot_data(self):
+        x = np.linspace(0,1,100)
+        y = 0.5 + 0.4*np.cos(2.5 * np.pi * x)
+        mp.plot(x, y)
+
+    def error_calculation(self):
+        error = []
+        sum = 0
+        for i in range(len(self.inputs)):
+            err = self.targets[i] - self.predictions[i]
+            error.append(err)
+            sum = sum + err
+        return sum / 100
+        
+            
 
 
 
-
-rbf = RBF(nu=0.01, bases=2)
-rbf.train(5)
-predictions = rbf.step_function()
-mp.plot(rbf.inputs, rbf.targets, '-o', label='true')
-mp.plot(rbf.inputs, predictions, 'o', label='RBF')
+rbf = RBF(nu=0.01, bases=3, kmeans=False)
+rbf.train(3)
+output = rbf.mse()
+# print(predictions)
+mp.scatter(rbf.inputs, rbf.targets, label='true')
+error_sum = rbf.error_calculation()
+print(error_sum)
+#model.fit(rbf.weights, rbf.gaussian_centers)
+mp.scatter(rbf.inputs, output, label='RBF')
+rbf.plot_data()
 mp.legend()
 mp.show()
